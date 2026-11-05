@@ -18,6 +18,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <thread>
 #include <geometry_msgs/msg/transform_stamped.hpp>
+#include <magic_enum/magic_enum.hpp>
 
 #include "orbbec_camera/utils.h"
 #include <filesystem>
@@ -204,8 +205,10 @@ void OBLidarNode::setupDevices() {
     }
   }
   if (device_->isPropertySupported(OB_PROP_HEARTBEAT_BOOL, OB_PERMISSION_READ_WRITE)) {
-    RCLCPP_INFO_STREAM(logger_, "Current heartbeat: " << (enable_heartbeat_ ? "ON" : "OFF"));
     TRY_TO_SET_PROPERTY(setBoolProperty, OB_PROP_HEARTBEAT_BOOL, enable_heartbeat_);
+    TRY_EXECUTE_BLOCK(RCLCPP_INFO_STREAM(
+        logger_, "Current heartbeat: "
+                     << (device_->getBoolProperty(OB_PROP_HEARTBEAT_BOOL) ? "ON" : "OFF")));
   }
   if (!echo_mode_.empty() &&
       device_->isPropertySupported(OB_PROP_LIDAR_SPECIFIC_MODE_INT, OB_PERMISSION_READ_WRITE)) {
@@ -214,10 +217,10 @@ void OBLidarNode::setupDevices() {
     } else if (echo_mode_ == "First Echo") {
       TRY_TO_SET_PROPERTY(setIntProperty, OB_PROP_LIDAR_SPECIFIC_MODE_INT, 1);
     }
-    RCLCPP_INFO_STREAM(
+    TRY_EXECUTE_BLOCK(RCLCPP_INFO_STREAM(
         logger_, "Current echo mode: " << (device_->getIntProperty(OB_PROP_LIDAR_SPECIFIC_MODE_INT)
                                                ? "First Echo"
-                                               : "Last Echo"));
+                                               : "Last Echo")));
   }
   if (repetitive_scan_mode_ != -1 &&
       device_->isPropertySupported(OB_PROP_LIDAR_REPETITIVE_SCAN_MODE_INT,
@@ -230,8 +233,9 @@ void OBLidarNode::setupDevices() {
     } else {
       TRY_TO_SET_PROPERTY(setIntProperty, OB_PROP_LIDAR_REPETITIVE_SCAN_MODE_INT,
                           repetitive_scan_mode_);
-      RCLCPP_INFO_STREAM(logger_, "Current repetitive scan mode: " << device_->getIntProperty(
-                                      OB_PROP_LIDAR_REPETITIVE_SCAN_MODE_INT));
+      TRY_EXECUTE_BLOCK(RCLCPP_INFO_STREAM(
+          logger_, "Current repetitive scan mode: "
+                       << device_->getIntProperty(OB_PROP_LIDAR_REPETITIVE_SCAN_MODE_INT)));
     }
   }
   if (filter_level_ != -1 &&
@@ -241,10 +245,12 @@ void OBLidarNode::setupDevices() {
       RCLCPP_ERROR(logger_, "filter level value is out of range[%d,%d], please check the value",
                    range.min, range.max);
     } else {
-      TRY_TO_SET_PROPERTY(setIntProperty, OB_PROP_LIDAR_TAIL_FILTER_LEVEL_INT, filter_level_);
-      TRY_TO_SET_PROPERTY(setIntProperty, OB_PROP_LIDAR_APPLY_CONFIGS_INT, 1);
-      RCLCPP_INFO_STREAM(logger_, "Current filter level: " << device_->getIntProperty(
-                                      OB_PROP_LIDAR_TAIL_FILTER_LEVEL_INT));
+      TRY_EXECUTE_BLOCK({
+        device_->setIntProperty(OB_PROP_LIDAR_TAIL_FILTER_LEVEL_INT, filter_level_);
+        device_->setIntProperty(OB_PROP_LIDAR_APPLY_CONFIGS_INT, 1);
+        RCLCPP_INFO_STREAM(logger_, "Current filter level: " << device_->getIntProperty(
+                                        OB_PROP_LIDAR_TAIL_FILTER_LEVEL_INT));
+      });
     }
   }
 
@@ -256,8 +262,9 @@ void OBLidarNode::setupDevices() {
                    range.min, range.max);
     } else {
       TRY_TO_SET_PROPERTY(setFloatProperty, OB_PROP_LIDAR_MEMS_FOV_SIZE_FLOAT, vertical_fov_);
-      RCLCPP_INFO_STREAM(logger_, "Current vertical fov: " << device_->getFloatProperty(
-                                      OB_PROP_LIDAR_MEMS_FOV_SIZE_FLOAT));
+      TRY_EXECUTE_BLOCK(RCLCPP_INFO_STREAM(
+          logger_, "Current vertical fov: "
+                       << device_->getFloatProperty(OB_PROP_LIDAR_MEMS_FOV_SIZE_FLOAT)));
     }
   }
 }
@@ -296,8 +303,9 @@ void OBLidarNode::setupProfiles() {
         }
 
       } catch (const ob::Error &ex) {
-        RCLCPP_ERROR_STREAM(
-            logger_, "Failed to get " << stream_name_[elem] << "  profile: " << ex.getMessage());
+        RCLCPP_ERROR_STREAM(logger_, "Failed to get "
+                                         << stream_name_[elem] << "  profile: "
+                                         << orbbec_camera::formatObErrorWithStatus(ex));
         RCLCPP_ERROR_STREAM(logger_, "Stream: " << magic_enum::enum_name(elem.first)
                                                 << ", Stream Index: " << elem.second
                                                 << ", Scan Rate: " << rate_[elem]
@@ -1163,8 +1171,8 @@ void OBLidarNode::publishStaticTransforms() {
   if (!publish_tf_) {
     return;
   }
-  static_tf_broadcaster_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(node_);
-  dynamic_tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(node_);
+  static_tf_broadcaster_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(*node_);
+  dynamic_tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(*node_);
   calcAndPublishStaticTransform();
   if (tf_publish_rate_ > 0) {
     tf_thread_ = std::make_shared<std::thread>([this]() { publishDynamicTransforms(); });
@@ -1261,9 +1269,9 @@ void OBLidarNode::calcAndPublishStaticTransform() {
         ex = base_stream_profile->getExtrinsicTo(stream_profile_[GYRO]);
         RCLCPP_INFO_STREAM(logger_, "Using GYRO extrinsic for IMU");
       } catch (const ob::Error &e2) {
-        RCLCPP_ERROR_STREAM(
-            logger_, "Failed to get "
-                         << frame_id << " extrinsic from both ACCEL and GYRO: " << e2.getMessage());
+        RCLCPP_ERROR_STREAM(logger_, "Failed to get "
+                                         << frame_id << " extrinsic from both ACCEL and GYRO: "
+                                         << orbbec_camera::formatObErrorWithStatus(e2));
         ex = OBExtrinsic({{1, 0, 0, 0, 1, 0, 0, 0, 1}, {0, 0, 0}});
       }
     }

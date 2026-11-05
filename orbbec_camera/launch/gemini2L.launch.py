@@ -64,7 +64,8 @@ def load_parameters(context, args):
     if config_file_path:
         yaml_params = load_yaml(config_file_path)
         default_params = merge_params(default_params, yaml_params)
-    skip_convert = {"config_file_path", "usb_port", "serial_number"}
+    skip_convert = {"config_file_path", "usb_port", "serial_number", 'bag_record_filename', 'bag_filename',
+                    "depth_colorizer_mode"}
 
     return {
         key: (value if key in skip_convert else convert_value(value))
@@ -79,6 +80,9 @@ def generate_launch_description():
         DeclareLaunchArgument("serial_number", default_value=""),
         DeclareLaunchArgument("usb_port", default_value=""),
         DeclareLaunchArgument("device_num", default_value="1"),
+        DeclareLaunchArgument("bag_record_filename", default_value=""),
+        DeclareLaunchArgument("bag_filename", default_value=""),
+        DeclareLaunchArgument("bag_loop", default_value="false"),
         DeclareLaunchArgument("uvc_backend", default_value="libuvc"),  # libuvc or v4l2
         DeclareLaunchArgument("product_id", default_value=""),
         DeclareLaunchArgument("enable_point_cloud", default_value="true"),
@@ -86,6 +90,7 @@ def generate_launch_description():
         DeclareLaunchArgument("enable_colored_point_cloud", default_value="false"),
         DeclareLaunchArgument("point_cloud_qos", default_value="default"),
         DeclareLaunchArgument("connection_delay", default_value="100"),
+        DeclareLaunchArgument("color_frame_queue_max_frames", default_value="1"),
         DeclareLaunchArgument("color_width", default_value="1280"),
         DeclareLaunchArgument("color_height", default_value="800"),
         DeclareLaunchArgument("color_fps", default_value="30"),
@@ -93,6 +98,8 @@ def generate_launch_description():
         DeclareLaunchArgument("enable_color", default_value="true"),
         DeclareLaunchArgument("color_flip", default_value="false"),
         DeclareLaunchArgument("color_qos", default_value="default"),
+        DeclareLaunchArgument("color_qos_history", default_value="default"),
+        DeclareLaunchArgument("color_qos_depth", default_value="-1"),
         DeclareLaunchArgument("color_camera_info_qos", default_value="default"),
         DeclareLaunchArgument("enable_color_auto_exposure", default_value="true"),
         DeclareLaunchArgument("color_ae_max_exposure", default_value="-1"),
@@ -112,6 +119,8 @@ def generate_launch_description():
         DeclareLaunchArgument("enable_depth", default_value="true"),
         DeclareLaunchArgument("depth_flip", default_value="false"),
         DeclareLaunchArgument("depth_qos", default_value="default"),
+        DeclareLaunchArgument("depth_qos_history", default_value="default"),
+        DeclareLaunchArgument("depth_qos_depth", default_value="-1"),
         DeclareLaunchArgument("depth_camera_info_qos", default_value="default"),
         DeclareLaunchArgument("ir_width", default_value="640"),
         DeclareLaunchArgument("ir_height", default_value="400"),
@@ -120,6 +129,8 @@ def generate_launch_description():
         DeclareLaunchArgument("enable_ir", default_value="true"),
         DeclareLaunchArgument("ir_flip", default_value="false"),
         DeclareLaunchArgument("ir_qos", default_value="default"),
+        DeclareLaunchArgument("ir_qos_history", default_value="default"),
+        DeclareLaunchArgument("ir_qos_depth", default_value="-1"),
         DeclareLaunchArgument("ir_camera_info_qos", default_value="default"),
         DeclareLaunchArgument("enable_ir_auto_exposure", default_value="true"),
         DeclareLaunchArgument("ir_ae_max_exposure", default_value="-1"),
@@ -139,10 +150,11 @@ def generate_launch_description():
         DeclareLaunchArgument("tf_publish_rate", default_value="0.0"),
         DeclareLaunchArgument("ir_info_url", default_value=""),
         DeclareLaunchArgument("color_info_url", default_value=""),
-        DeclareLaunchArgument("log_level", default_value="none"),
+        DeclareLaunchArgument("log_level", default_value="info"),
         DeclareLaunchArgument("log_file_name", default_value=""),
         DeclareLaunchArgument("enable_publish_extrinsic", default_value="false"),
         DeclareLaunchArgument("enable_d2c_viewer", default_value="false"),
+        DeclareLaunchArgument("depth_colorizer_mode", default_value="none"),
         DeclareLaunchArgument("disparity_to_depth_mode", default_value="SW"),
         DeclareLaunchArgument("enable_ldp", default_value="true"),
         DeclareLaunchArgument("enable_decimation_filter", default_value="false"),
@@ -183,9 +195,14 @@ def generate_launch_description():
         DeclareLaunchArgument("laser_energy_level", default_value="-1"),
         DeclareLaunchArgument("enable_heartbeat", default_value="false"),
         DeclareLaunchArgument("enable_firmware_log", default_value="false"),
+        DeclareLaunchArgument("monitor_poll_interval_sec", default_value="-1"),
         DeclareLaunchArgument("time_domain", default_value="global"),
-        DeclareLaunchArgument("enable_frame_timestamp_csv", default_value="false"),
+        DeclareLaunchArgument("timestamp_clock_type", default_value=""),  # realtime or monotonic, default is realtime.
+        DeclareLaunchArgument("enable_frame_drop_log", default_value="false"),
         DeclareLaunchArgument("frame_timestamp_csv_file", default_value=""),
+        DeclareLaunchArgument("enable_color_undistortion", default_value="false"),
+        DeclareLaunchArgument("enable_depth_undistortion", default_value="false"),
+        DeclareLaunchArgument("enable_ir_undistortion", default_value="false"),
         DeclareLaunchArgument("config_file_path", default_value=""),
     ]
 

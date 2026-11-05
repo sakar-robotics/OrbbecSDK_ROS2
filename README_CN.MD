@@ -21,9 +21,16 @@
   <a href="https://docs.ros.org/en/jazzy/">
     <img src="https://img.shields.io/badge/ROS-Jazzy-f5792a?style=flat-square&amp;logo=ros&amp;logoColor=white" height="20" alt="ROS Jazzy">
   </a>
+  <a href="https://docs.ros.org/en/lyrical/">
+    <img src="https://img.shields.io/badge/ROS-Lyrical-f5792a?style=flat-square&amp;logo=ros&amp;logoColor=white" height="20" alt="ROS Lyrical">
+  </a>
+  <a href="https://docs.ros.org/en/rolling/">
+    <img src="https://img.shields.io/badge/ROS-Rolling-f5792a?style=flat-square&amp;logo=ros&amp;logoColor=white" height="20" alt="ROS Rolling">
+  </a>
   <img src="https://img.shields.io/badge/Ubuntu-20.04-0078d4?style=flat-square&amp;logo=ubuntu&amp;logoColor=white" height="20" alt="Ubuntu 20.04">
   <img src="https://img.shields.io/badge/Ubuntu-22.04-0078d4?style=flat-square&amp;logo=ubuntu&amp;logoColor=white" height="20" alt="Ubuntu 22.04">
   <img src="https://img.shields.io/badge/Ubuntu-24.04-0078d4?style=flat-square&amp;logo=ubuntu&amp;logoColor=white" height="20" alt="Ubuntu 24.04">
+  <img src="https://img.shields.io/badge/Ubuntu-26.04-0078d4?style=flat-square&amp;logo=ubuntu&amp;logoColor=white" height="20" alt="Ubuntu 26.04">
 
   <!-- Second row: -->
   <br>
@@ -40,11 +47,31 @@
 
 ## 简介
 
-OrbbecSDK ROS2 Wrapper 提供 Orbbec 相机与 ROS 2 环境的无缝集成，支持 **ROS2 Foxy、Humble 和 Jazzy** 发行版。
+OrbbecSDK ROS2 Wrapper 提供 Orbbec 相机与 ROS 2 环境的无缝集成，支持 **ROS2 Foxy、Humble、Jazzy、Lyrical 和 Rolling** 发行版。
 
 - 默认推荐使用 **v2-main** 分支。
 - 对于旧的 **OpenNI** 设备（v2-main 不支持），请使用 **main** 分支。
 - 如果您在中国使用，建议使用 [gitee 仓库](https://gitee.com/orbbecdeveloper/OrbbecSDK_ROS2)。
+
+## 从这里开始
+
+完整的使用方法、参数说明和故障排查统一维护在官方
+[OrbbecSDK ROS2 文档站](https://orbbec.github.io/OrbbecSDK_ROS2/zh/index.html)。
+请根据您的目标直接进入对应指南。
+
+| 我想要……                           | 请查看……                                                                                                             |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| 安装驱动并配置设备权限               | [安装指南](https://orbbec.github.io/OrbbecSDK_ROS2/zh/source/camera_devices/2_installation/installation.html)           |
+| 启动相机并在 RViz2 中查看图像        | [ROS 包快速入门](https://orbbec.github.io/OrbbecSDK_ROS2/zh/source/camera_devices/3_quickstarts/quickstart.html)        |
+| 确认设备支持、固件版本和启动文件     | [支持的硬件](https://orbbec.github.io/OrbbecSDK_ROS2/zh/source/camera_devices/1_overview/introduction.html)             |
+| 配置启动参数、话题、服务、TF 或点云  | [应用指南](https://orbbec.github.io/OrbbecSDK_ROS2/zh/source/camera_devices/4_application_guide/application_guide.html) |
+| 查找维护、诊断、性能测试或多相机工具 | [工具索引](https://orbbec.github.io/OrbbecSDK_ROS2/zh/source/camera_devices/6_benchmark/tools.html)                     |
+| 使用网络相机、GMSL、多相机或高级模式 | [高级指南](https://orbbec.github.io/OrbbecSDK_ROS2/zh/source/camera_devices/5_advanced_guide/advanced_guide.html)       |
+| 排查故障或收集技术支持所需日志       | [常见问题](https://orbbec.github.io/OrbbecSDK_ROS2/zh/source/camera_devices/8_FAQ/FAQ.html)                             |
+| 将现有项目从 main (v1.x) 迁移        | [迁移指南](https://orbbec.github.io/OrbbecSDK_ROS2/zh/source/camera_devices/7_developer_guide/migration_guide.html)     |
+| 使用 Orbbec LiDAR                    | [LiDAR 文档](https://orbbec.github.io/OrbbecSDK_ROS2/zh/source/lidar_devices/index.html)                                |
+
+实用启动示例的源文件可在[示例索引](./orbbec_camera/examples/)中查找。
 
 ## 分支选择
 
@@ -78,7 +105,7 @@ OrbbecSDK ROS2 Wrapper 提供 Orbbec 相机与 ROS 2 环境的无缝集成，支
       <td>recommended for new designs</td>
     </tr>
     <tr>
-      <td rowspan="8" style="text-align: center; font-weight: bold;">Gemini 330</td>
+      <td rowspan="10" style="text-align: center; font-weight: bold;">Gemini 330</td>
       <td>Gemini 335</td>
       <td>full maintenance</td>
       <td>recommended for new designs</td>
@@ -115,6 +142,16 @@ OrbbecSDK ROS2 Wrapper 提供 Orbbec 相机与 ROS 2 环境的无缝集成，支
     </tr>
     <tr>
       <td>Gemini 335Le</td>
+      <td>not supported</td>
+      <td>recommended for new designs</td>
+    </tr>
+    <tr>
+      <td>Gemini 338Le</td>
+      <td>not supported</td>
+      <td>recommended for new designs</td>
+    </tr>
+    <tr>
+      <td>Gemini 338Lg</td>
       <td>not supported</td>
       <td>recommended for new designs</td>
     </tr>
@@ -207,7 +244,7 @@ OrbbecSDK ROS2 Wrapper 提供 Orbbec 相机与 ROS 2 环境的无缝集成，支
   </tbody>
 </table>
 
-**注意**: 雷达设备在v2.6.3及之后的版本中支持。使用详情请参考[文档](https://orbbec.github.io/OrbbecSDK_ROS2/zh/source/lidar_devices/index.html).如果您没有找到对应的设备，请联系 FAE 或销售代表获取帮助。
+**注意**: 雷达设备在 v2.6.3 及之后的版本中支持。使用详情请参考[雷达文档](https://orbbec.github.io/OrbbecSDK_ROS2/zh/source/lidar_devices/index.html)。如果您没有找到对应的设备，请联系 FAE 或销售代表获取帮助。
 
 **定义**:
 
@@ -225,9 +262,17 @@ OrbbecSDK ROS2 Wrapper 提供 Orbbec 相机与 ROS 2 环境的无缝集成，支
 
 **环境配置**
 
-根据官方指南安装 ROS 2：
+根据相应的官方指南安装一个受支持的 ROS 2 发行版：
 
-* [ROS 2 安装指南（Ubuntu）](https://docs.ros.org/en/humble/Installation/Ubuntu-Install-Debians.html)
+* [Foxy](https://docs.ros.org/en/foxy/)
+* [Humble](https://docs.ros.org/en/humble/)
+* [Jazzy](https://docs.ros.org/en/jazzy/)
+
+执行后续命令前，请先加载 ROS 2 环境：
+
+```bash
+source /opt/ros/humble/setup.bash  # 根据需要将 humble 替换为 foxy 或 jazzy
+```
 
 安装依赖项：
 
@@ -255,10 +300,10 @@ sudo apt update
 apt list | grep orbbec
 ```
 
-安装 OrbbecSDK ROS2 包：
+如果当前 ROS 2 发行版提供二进制包，可使用以下命令安装 OrbbecSDK ROS2：
 
 ```bash
-sudo apt install ros-humble-orbbec-camera ros-humble-orbbec-description
+sudo apt install ros-${ROS_DISTRO}-orbbec-camera ros-${ROS_DISTRO}-orbbec-description
 ```
 
 安装完成后，直接使用即可，无需编译。
@@ -286,6 +331,7 @@ git checkout v2-main
 cd ~/ros2_ws
 colcon build --event-handlers console_direct+ --cmake-args -DCMAKE_BUILD_TYPE=Release
 ```
+
 ## 注册脚本（必需）
 
 为了让 Orbbec 相机在 Linux 上被正确识别，请安装 udev 规则。
@@ -302,12 +348,11 @@ sudo udevadm control --reload-rules && sudo udevadm trigger
 ```bash
 cd  ~/ros2_ws/src/OrbbecSDK_ROS2/orbbec_camera/scripts
 sudo bash install_udev_rules.sh
-sudo udevadm control --reload-rules && sudo udevadm trigger
 ```
 
 此步骤对于 Linux 用户是**必需的**。
 
-`注意：` 如果不执行此脚本，由于权限问题，打开设备将会失败。您需要使用 sudo（管理员权限）运行示例程序。
+> **注意：** 如果未安装 udev 规则，可能因权限不足而无法打开设备。请正确安装规则并重新插拔相机，不建议使用 `sudo` 运行 ROS 2 节点。
 
 ## 快速开始
 
@@ -354,7 +399,7 @@ ros2 service call /camera/get_sdk_version orbbec_camera_msgs/srv/GetString '{}'
 
 ## 支持的设备
 
-目前 v2-main 分支支持以下设备。更多设备支持将陆续增加。如果没有找到您的设备，请尝试 [main](https://github.com/orbbec/OrbbecSDK_ROS2) 分支。
+目前 v2-main 分支支持以下设备。更多设备支持将陆续增加。如果没有找到您的设备，请尝试 [main](https://github.com/orbbec/OrbbecSDK_ROS2/tree/main) 分支。
 
 为获得最佳性能，强烈建议更新至最新固件版本，以确保您能获得最新的改进和 bug 修复。
 
@@ -371,33 +416,35 @@ ros2 service call /camera/get_sdk_version orbbec_camera_msgs/srv/GetString '{}'
     <tr>
       <td style="text-align: center; font-weight: bold;">Gemini 430</td>
       <td>Gemini 435Le</td>
-      <td><a href="https://github.com/orbbec/OrbbecFirmware/releases/tag/Gemin435Le-Firmware">1.3.6</a></td>
+      <td><a href="https://github.com/orbbec/OrbbecFirmware/releases/tag/Gemin435Le-Firmware">1.3.19</a></td>
       <td>gemini435_le.launch.py</td>
     </tr>
     <tr>
       <td rowspan="2" style="text-align: center; font-weight: bold;">Gemini 301</td>
       <td>Gemini 305</td>
       <td><a href="https://doc.orbbec.com/documentation/Gemini%20305%20Documentation/Firmware%20Release%20of%20Gemini%20305">1.0.70</a></td>
-      <td>gemini305.launch.py</td>
+      <td>gemini_301_series.launch.py</td>
     </tr>
     <tr>
       <td>Gemini 305g</td>
       <td><a href="https://doc.orbbec.com/documentation/Gemini%20305%20Documentation/Firmware%20Release%20of%20Gemini%20305">1.0.70</a></td>
-      <td>gemini305_g.launch.py</td>
+      <td>gemini_301_series.launch.py</td>
     </tr>
     <tr>
-      <td rowspan="8" style="text-align: center; font-weight: bold;">Gemini 330</td>
+      <td rowspan="10" style="text-align: center; font-weight: bold;">Gemini 330</td>
       <td>Gemini 335</td>
-      <td><a href="https://orbbec-debian-repos-aws.s3.amazonaws.com/product/Gemini330_Release_1.6.00.zip">1.6.00</a></td>
+      <td><a href="https://orbbec-debian-repos-aws.s3.amazonaws.com/product/Gemini330_Release_1.8.10.zip">1.8.10</a></td>
       <td>gemini_330_series.launch.py</td>
     </tr>
-    <tr><td>Gemini 336</td><td><a href="https://orbbec-debian-repos-aws.s3.amazonaws.com/product/Gemini330_Release_1.6.00.zip">1.6.00</a></td><td>gemini_330_series.launch.py</td></tr>
-    <tr><td>Gemini 330</td><td><a href="https://orbbec-debian-repos-aws.s3.amazonaws.com/product/Gemini330_Release_1.6.00.zip">1.6.00</a></td><td>gemini_330_series.launch.py</td></tr>
-    <tr><td>Gemini 335L</td><td><a href="https://orbbec-debian-repos-aws.s3.amazonaws.com/product/Gemini330_Release_1.6.00.zip">1.6.00</a></td><td>gemini_330_series.launch.py</td></tr>
-    <tr><td>Gemini 336L</td><td><a href="https://orbbec-debian-repos-aws.s3.amazonaws.com/product/Gemini330_Release_1.6.00.zip">1.6.00</a></td><td>gemini_330_series.launch.py</td></tr>
-    <tr><td>Gemini 330L</td><td><a href="https://orbbec-debian-repos-aws.s3.amazonaws.com/product/Gemini330_Release_1.6.00.zip">1.6.00</a></td><td>gemini_330_series.launch.py</td></tr>
-    <tr><td>Gemini 335Lg</td><td><a href="https://orbbec-debian-repos-aws.s3.amazonaws.com/product/Gemini330_Release_1.6.00.zip">1.6.00</a></td><td>gemini_330_series.launch.py</td></tr>
-    <tr><td>Gemini 335Le</td><td><a href="https://orbbec-debian-repos-aws.s3.amazonaws.com/product/Gemini330_Release_1.6.00.zip">1.6.00</a></td><td>gemini_330_series.launch.py</td></tr>
+    <tr><td>Gemini 336</td><td><a href="https://orbbec-debian-repos-aws.s3.amazonaws.com/product/Gemini330_Release_1.8.10.zip">1.8.10</a></td><td>gemini_330_series.launch.py</td></tr>
+    <tr><td>Gemini 330</td><td><a href="https://orbbec-debian-repos-aws.s3.amazonaws.com/product/Gemini330_Release_1.8.10.zip">1.8.10</a></td><td>gemini_330_series.launch.py</td></tr>
+    <tr><td>Gemini 335L</td><td><a href="https://orbbec-debian-repos-aws.s3.amazonaws.com/product/Gemini330_Release_1.8.10.zip">1.8.10</a></td><td>gemini_330_series.launch.py</td></tr>
+    <tr><td>Gemini 336L</td><td><a href="https://orbbec-debian-repos-aws.s3.amazonaws.com/product/Gemini330_Release_1.8.10.zip">1.8.10</a></td><td>gemini_330_series.launch.py</td></tr>
+    <tr><td>Gemini 330L</td><td><a href="https://orbbec-debian-repos-aws.s3.amazonaws.com/product/Gemini330_Release_1.8.10.zip">1.8.10</a></td><td>gemini_330_series.launch.py</td></tr>
+    <tr><td>Gemini 335Lg</td><td><a href="https://orbbec-debian-repos-aws.s3.amazonaws.com/product/Gemini330_Release_1.8.10.zip">1.8.10</a></td><td>gemini_330_series.launch.py</td></tr>
+    <tr><td>Gemini 335Le</td><td><a href="https://orbbec-debian-repos-aws.s3.amazonaws.com/product/Gemini330_Release_1.8.10.zip">1.8.10</a></td><td>gemini_330_series.launch.py</td></tr>
+    <tr><td>Gemini 338Le</td><td><a href="https://orbbec-debian-repos-aws.s3.amazonaws.com/product/Gemini330_Release_v1.8.17.zip">1.8.17</a></td><td>gemini_330_series.launch.py</td></tr>
+    <tr><td>Gemini 338Lg</td><td><a href="https://orbbec-debian-repos-aws.s3.amazonaws.com/product/Gemini330_Release_v1.8.17.zip">1.8.17</a></td><td>gemini_330_series.launch.py</td></tr>
     <tr>
       <td style="text-align: center; font-weight: bold;">Gemini 340</td>
       <td>Gemini 345Lg</td>
@@ -474,17 +521,10 @@ ros2 service call /camera/get_sdk_version orbbec_camera_msgs/srv/GetString '{}'
 
 所有启动文件基本相似，主要区别在于针对不同型号的默认参数设置。不同的 USB 标准（如 USB 2.0 和 USB 3.0）可能需要调整这些参数。如果遇到启动失败，请仔细查看规格说明书，特别是启动文件中的分辨率设置以及其他参数，以确保兼容性和最佳性能。
 
-## 教程
-
-请参考官方 [OrbbecSDK ROS2 文档](https://orbbec.github.io/OrbbecSDK_ROS2/zh/source/camera_devices/5_advanced_guide/advanced_guide.html)
-
-## 示例
-
-要查看更多实践示例并了解如何在 ROS 中使用相机，请参阅 [Examples](./orbbec_camera/examples/) 部分。
-
-## 其他有用链接
+## 相关链接
 
 - [OrbbecSDK ROS2 文档](https://orbbec.github.io/OrbbecSDK_ROS2/zh/index.html)
+- [示例索引](./orbbec_camera/examples/)
 - [OrbbecSDK_v2](https://github.com/orbbec/OrbbecSDK_v2/releases)
 - [Gemini 330 深度预设](https://www.orbbec.com/docs/g330-use-depth-presets/)
 

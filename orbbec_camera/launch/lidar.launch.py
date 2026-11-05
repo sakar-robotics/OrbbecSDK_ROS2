@@ -67,11 +67,6 @@ def generate_launch_description():
             description='Number of devices to start. Required when launching multiple devices.'
         ),
         DeclareLaunchArgument(
-            'upgrade_firmware',
-            default_value='',
-            description='Firmware file path. If set, attempts firmware upgrade on startup; empty means no upgrade.'
-        ),
-        DeclareLaunchArgument(
             'connection_delay',
             default_value='10',
             description='Reopen delay after hot-plug (milliseconds). Prevents firmware issues caused by immediate reconnect.'
@@ -168,7 +163,7 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             'log_level',
-            default_value='none',
+            default_value='info',
             description='Shared SDK and ROS log level: none, debug, info, warn, error, fatal.'
         ),
         DeclareLaunchArgument(
@@ -180,6 +175,11 @@ def generate_launch_description():
             'time_domain',
             default_value='device',  # global, device, system
             description='Timestamp domain: device (device clock), global (time sync), or system (host clock).'
+        ),
+        DeclareLaunchArgument(
+            'timestamp_clock_type',
+            default_value='',
+            description='SDK timestamp clock type: realtime or monotonic, default is realtime.'
         ),
         DeclareLaunchArgument(
             'config_file_path',
