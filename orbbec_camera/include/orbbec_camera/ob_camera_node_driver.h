@@ -81,6 +81,12 @@ class OBCameraNodeDriver : public rclcpp::Node {
 
   void deviceStatusTimer();
 
+  // The cross-process device lock in /dev/shm (ORB_DEFAULT_LOCK_NAME): open or create it, and
+  // close it, deleting it when no other driver has it open.
+  bool openDeviceLock();
+
+  void closeDeviceLock();
+
   void rebootDeviceCallback(const std::shared_ptr<std_srvs::srv::Empty::Request> request,
                             std::shared_ptr<std_srvs::srv::Empty::Response> response);
 
@@ -129,7 +135,6 @@ class OBCameraNodeDriver : public rclcpp::Node {
   std::atomic_bool reset_device_flag_{false};
   std::chrono::steady_clock::time_point last_reset_device_completion_time_;
   pthread_mutex_t* orb_device_lock_ = nullptr;
-  pthread_mutexattr_t orb_device_lock_attr_;
   uint8_t* orb_device_lock_shm_addr_ = nullptr;
   int orb_device_lock_shm_fd_ = -1;
   // net config
