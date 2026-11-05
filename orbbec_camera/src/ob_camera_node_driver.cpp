@@ -36,8 +36,12 @@
 #endif
 #include <rcutils/logging.h>
 #include <csignal>
+#include <sys/file.h>
 #include <sys/mman.h>
+#include <sys/stat.h>
 #include <unistd.h>
+#include <cerrno>
+#include <cstring>
 #include <filesystem>
 #include <atomic>
 
@@ -268,12 +272,143 @@ OBCameraNodeDriver::~OBCameraNodeDriver() {
     }
   }
 
-  if (orb_device_lock_shm_fd_ != -1) {
-    close(orb_device_lock_shm_fd_);
-    orb_device_lock_shm_fd_ = -1;
-  }
-  shm_unlink(ORB_DEFAULT_LOCK_NAME.c_str());
+  closeDeviceLock();
   clearGlobalImageTransportPublishers(*this);
+}
+
+namespace {
+// What the device lock in /dev/shm holds. Older drivers left a bare pthread_mutex_t there, which
+// every driver re-initialised at start; magic tells this layout from that one.
+struct DeviceLockShm {
+  uint32_t magic;
+  pthread_mutex_t mutex;
+};
+constexpr uint32_t DEVICE_LOCK_MAGIC = 0x4f424c32;  // "OBL2"
+const std::string DEVICE_LOCK_PATH = "/dev/shm/" + ORB_DEFAULT_LOCK_NAME;
+
+DeviceLockShm *mapDeviceLock(int fd) {
+  void *addr = mmap(nullptr, sizeof(DeviceLockShm), PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+  return addr == MAP_FAILED ? nullptr : static_cast<DeviceLockShm *>(addr);
+}
+
+// Whether fd is still the file DEVICE_LOCK_PATH names, i.e. no driver has deleted it since.
+bool isCurrentDeviceLock(int fd) {
+  struct stat by_fd{};
+  struct stat by_path{};
+  return fstat(fd, &by_fd) == 0 && stat(DEVICE_LOCK_PATH.c_str(), &by_path) == 0 &&
+         by_fd.st_ino == by_path.st_ino;
+}
+}  // namespace
+
+// Every driver on the machine shares one mutex so that two never open devices at once. /dev/shm
+// is shared by the host and every container, so the file must work for any user: it is made
+// 0666 whatever the umask, and deleted by the last driver to close it. Each driver holds a
+// flock(LOCK_SH) on it while open; the kernel drops it when the process dies, however it dies.
+// The creator holds LOCK_EX until the mutex is ready, so LOCK_SH also waits for that. The mutex
+// is robust, so one whose holder died is taken over rather than stuck (see startDevice).
+bool OBCameraNodeDriver::openDeviceLock() {
+  const char *name = ORB_DEFAULT_LOCK_NAME.c_str();
+  constexpr int max_attempts = 50;
+  for (int attempt = 0; attempt < max_attempts; ++attempt) {
+    if (attempt > 0) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    }
+    int fd = shm_open(name, O_CREAT | O_EXCL | O_RDWR, 0666);
+    if (fd >= 0) {
+      DeviceLockShm *shm = nullptr;
+      if (flock(fd, LOCK_EX) == 0 && fchmod(fd, 0666) == 0 &&
+          ftruncate(fd, sizeof(DeviceLockShm)) == 0) {
+        shm = mapDeviceLock(fd);
+      }
+      if (shm == nullptr) {
+        RCLCPP_ERROR_STREAM(
+            logger_, "Failed to create " << DEVICE_LOCK_PATH << ": " << std::strerror(errno));
+        shm_unlink(name);
+        close(fd);
+        return false;
+      }
+      pthread_mutexattr_t attr;
+      pthread_mutexattr_init(&attr);
+      pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
+      pthread_mutexattr_setrobust(&attr, PTHREAD_MUTEX_ROBUST);
+      pthread_mutex_init(&shm->mutex, &attr);
+      pthread_mutexattr_destroy(&attr);
+      shm->magic = DEVICE_LOCK_MAGIC;
+      flock(fd, LOCK_SH);
+      orb_device_lock_shm_fd_ = fd;
+      orb_device_lock_shm_addr_ = reinterpret_cast<uint8_t *>(shm);
+      orb_device_lock_ = &shm->mutex;
+      return true;
+    }
+    if (errno != EEXIST) {
+      RCLCPP_ERROR_STREAM(logger_,
+                          "Failed to create " << DEVICE_LOCK_PATH << ": " << std::strerror(errno));
+      return false;
+    }
+    fd = shm_open(name, O_RDWR, 0);
+    if (fd < 0) {
+      if (errno == ENOENT) {
+        continue;  // deleted by its last driver between the two opens
+      }
+      RCLCPP_ERROR_STREAM(logger_, "Failed to open shared memory "
+                                       << ORB_DEFAULT_LOCK_NAME << ": " << std::strerror(errno)
+                                       << ". It was left by an older driver run as another user; "
+                                          "remove it once with: sudo rm "
+                                       << DEVICE_LOCK_PATH);
+      return false;
+    }
+    flock(fd, LOCK_SH);
+    if (!isCurrentDeviceLock(fd)) {
+      close(fd);
+      continue;  // deleted by its last driver while this one waited for LOCK_SH
+    }
+    struct stat st{};
+    fstat(fd, &st);
+    if (st.st_size == 0 && attempt < max_attempts / 2) {
+      close(fd);
+      continue;  // its creator hasn't taken LOCK_EX yet
+    }
+    DeviceLockShm *shm =
+        st.st_size == static_cast<off_t>(sizeof(DeviceLockShm)) ? mapDeviceLock(fd) : nullptr;
+    if (shm != nullptr && shm->magic == DEVICE_LOCK_MAGIC) {
+      orb_device_lock_shm_fd_ = fd;
+      orb_device_lock_shm_addr_ = reinterpret_cast<uint8_t *>(shm);
+      orb_device_lock_ = &shm->mutex;
+      return true;
+    }
+    // An older driver's layout, or a creator that died before finishing: replace it.
+    if (shm != nullptr) {
+      munmap(shm, sizeof(DeviceLockShm));
+    }
+    close(fd);
+    if (shm_unlink(name) != 0 && errno != ENOENT) {
+      RCLCPP_ERROR_STREAM(logger_, "Failed to replace stale "
+                                       << DEVICE_LOCK_PATH << ": " << std::strerror(errno)
+                                       << ". Remove it once with: sudo rm " << DEVICE_LOCK_PATH);
+      return false;
+    }
+    RCLCPP_WARN_STREAM(logger_, "Replaced stale " << DEVICE_LOCK_PATH);
+  }
+  RCLCPP_ERROR_STREAM(logger_, "Gave up opening " << DEVICE_LOCK_PATH);
+  return false;
+}
+
+void OBCameraNodeDriver::closeDeviceLock() {
+  if (orb_device_lock_shm_addr_ != nullptr) {
+    munmap(orb_device_lock_shm_addr_, sizeof(DeviceLockShm));
+    orb_device_lock_shm_addr_ = nullptr;
+    orb_device_lock_ = nullptr;
+  }
+  if (orb_device_lock_shm_fd_ < 0) {
+    return;
+  }
+  // LOCK_EX is only free when no other driver holds LOCK_SH: this is the last one out.
+  if (flock(orb_device_lock_shm_fd_, LOCK_EX | LOCK_NB) == 0 &&
+      isCurrentDeviceLock(orb_device_lock_shm_fd_)) {
+    shm_unlink(ORB_DEFAULT_LOCK_NAME.c_str());
+  }
+  close(orb_device_lock_shm_fd_);
+  orb_device_lock_shm_fd_ = -1;
 }
 
 void OBCameraNodeDriver::init() {
@@ -360,21 +495,7 @@ void OBCameraNodeDriver::init() {
   double time_sync_period = declare_parameter<double>("time_sync_period", 60.0);
   time_sync_period_ = std::chrono::milliseconds((int)(time_sync_period * 1000));
   g_time_domain = declare_parameter<std::string>("time_domain", g_time_domain);
-  orb_device_lock_shm_fd_ = shm_open(ORB_DEFAULT_LOCK_NAME.c_str(), O_CREAT | O_RDWR, 0666);
-  if (orb_device_lock_shm_fd_ < 0) {
-    RCLCPP_ERROR_STREAM(logger_, "Failed to open shared memory " << ORB_DEFAULT_LOCK_NAME);
-    return;
-  }
-  int ret = ftruncate(orb_device_lock_shm_fd_, sizeof(pthread_mutex_t));
-  if (ret < 0) {
-    RCLCPP_ERROR_STREAM(logger_, "Failed to truncate shared memory " << ORB_DEFAULT_LOCK_NAME);
-    return;
-  }
-  orb_device_lock_shm_addr_ =
-      static_cast<uint8_t *>(mmap(NULL, sizeof(pthread_mutex_t), PROT_READ | PROT_WRITE, MAP_SHARED,
-                                  orb_device_lock_shm_fd_, 0));
-  if (orb_device_lock_shm_addr_ == MAP_FAILED) {
-    RCLCPP_ERROR_STREAM(logger_, "Failed to map shared memory " << ORB_DEFAULT_LOCK_NAME);
+  if (!openDeviceLock()) {
     return;
   }
   reboot_device_srv_ = this->create_service<std_srvs::srv::Empty>(
@@ -383,10 +504,6 @@ void OBCameraNodeDriver::init() {
   set_bag_recording_srv_ = this->create_service<orbbec_camera_msgs::srv::SetBagRecording>(
       "set_bag_recording", std::bind(&OBCameraNodeDriver::setBagRecordingCallback, this,
                                      std::placeholders::_1, std::placeholders::_2));
-  pthread_mutexattr_init(&orb_device_lock_attr_);
-  pthread_mutexattr_setpshared(&orb_device_lock_attr_, PTHREAD_PROCESS_SHARED);
-  orb_device_lock_ = (pthread_mutex_t *)orb_device_lock_shm_addr_;
-  pthread_mutex_init(orb_device_lock_, &orb_device_lock_attr_);
   is_alive_.store(true);
   // Initialize the reset device completion time to allow immediate device connection on startup
   last_reset_device_completion_time_ = std::chrono::steady_clock::now() - std::chrono::seconds(10);
@@ -911,6 +1028,11 @@ void OBCameraNodeDriver::rebootDeviceCallback(
   timeout.tv_sec += 15;
 
   int lock_result = pthread_mutex_timedlock(orb_device_lock_, &timeout);
+  if (lock_result == EOWNERDEAD) {
+    RCLCPP_WARN_STREAM(logger_, "Device lock's previous holder died; taking it over");
+    pthread_mutex_consistent(orb_device_lock_);
+    lock_result = 0;
+  }
   if (lock_result != 0) {
     RCLCPP_WARN(logger_, "Failed to acquire process lock for reboot: %s", strerror(lock_result));
     return;
@@ -1502,6 +1624,11 @@ void OBCameraNodeDriver::startDevice(const std::shared_ptr<ob::DeviceList> &list
 
     if (try_lock_result == 0) {
       // success get lock,break
+      break;
+    } else if (try_lock_result == EOWNERDEAD) {
+      // The robust mutex's last holder died holding it; this driver holds it now.
+      RCLCPP_WARN_STREAM(logger_, "Device lock's previous holder died; taking it over");
+      pthread_mutex_consistent(orb_device_lock_);
       break;
     } else if (try_lock_result == EBUSY) {
       RCLCPP_WARN_STREAM(logger_, "Device lock is held by another process, waiting 100ms");
