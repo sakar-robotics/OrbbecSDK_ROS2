@@ -14,11 +14,75 @@
  * limitations under the License.
  *******************************************************************************/
 
+#include <algorithm>
+#include <chrono>
+#include <cstdlib>
+#include <filesystem>
+#include <iomanip>
+#include <mutex>
 #include <regex>
+#include <sstream>
+#include <vector>
 #include "orbbec_camera/utils.h"
 #include <sensor_msgs/point_cloud2_iterator.hpp>
 #include "orbbec_camera/constants.h"
 namespace orbbec_camera {
+OBLogSeverity obLogSeverityFromString(const std::string_view &log_level) {
+  if (log_level == "debug") {
+    return OBLogSeverity::OB_LOG_SEVERITY_DEBUG;
+  }
+  if (log_level == "info") {
+    return OBLogSeverity::OB_LOG_SEVERITY_INFO;
+  }
+  if (log_level == "warn" || log_level == "warning") {
+    return OBLogSeverity::OB_LOG_SEVERITY_WARN;
+  }
+  if (log_level == "error") {
+    return OBLogSeverity::OB_LOG_SEVERITY_ERROR;
+  }
+  if (log_level == "fatal") {
+    return OBLogSeverity::OB_LOG_SEVERITY_FATAL;
+  }
+  return OBLogSeverity::OB_LOG_SEVERITY_OFF;
+}
+
+std::string getRosLogDirectory() {
+  const char *home = std::getenv("HOME");
+  const std::filesystem::path home_dir = home != nullptr ? home : "";
+  return (home_dir / ".ros" / "Log").string();
+}
+
+std::string configureObSdkLoggerForTool(const std::string &tool_name,
+                                        const std::string &log_level) {
+  const auto severity = obLogSeverityFromString(log_level);
+  ob::Context::setLoggerSeverity(severity);
+  ob::Context::setLoggerToConsole(OBLogSeverity::OB_LOG_SEVERITY_OFF);
+
+  if (severity == OBLogSeverity::OB_LOG_SEVERITY_OFF) {
+    ob::Context::setLoggerToFile(OBLogSeverity::OB_LOG_SEVERITY_OFF, "");
+    return "";
+  }
+
+  const std::filesystem::path log_dir(getRosLogDirectory());
+  std::filesystem::create_directories(log_dir);
+
+  const auto now = std::chrono::system_clock::now();
+  const std::time_t now_time = std::chrono::system_clock::to_time_t(now);
+  std::tm tm{};
+#if defined(_WIN32)
+  localtime_s(&tm, &now_time);
+#else
+  localtime_r(&now_time, &tm);
+#endif
+
+  std::ostringstream file_name;
+  file_name << tool_name << "_sdk_" << std::put_time(&tm, "%Y%m%d_%H%M%S") << ".log";
+
+  ob::Context::setLoggerFileName(file_name.str());
+  ob::Context::setLoggerToFile(severity, log_dir.string().c_str());
+  return (log_dir / file_name.str()).string();
+}
+
 sensor_msgs::msg::CameraInfo convertToCameraInfo(OBCameraIntrinsic intrinsic,
                                                  OBCameraDistortion distortion, int width) {
   (void)width;
@@ -199,8 +263,6 @@ void savePointsToPly(const std::shared_ptr<ob::Frame> &frame, const std::string 
 
 tf2::Quaternion rotationMatrixToQuaternion(const float rotation[9]) {
   Eigen::Matrix3f m;
-  // We need to be careful about the order, as RS2 rotation matrix is
-  // column-major, while Eigen::Matrix3f expects row-major.
   m << rotation[0], rotation[1], rotation[2], rotation[3], rotation[4], rotation[5], rotation[6],
       rotation[7], rotation[8];
   Eigen::Quaternionf q(m);
@@ -272,6 +334,7 @@ OBFormat OBFormatFromString(const std::string &format) {
   std::string fixed_format;
   std::transform(format.begin(), format.end(), std::back_inserter(fixed_format),
                  [](const auto ch) { return std::isalpha(ch) ? toupper(ch) : ch; });
+  std::cout << "OBFormatFromString: " << fixed_format << std::endl;
   if (fixed_format == "MJPG") {
     return OB_FORMAT_MJPG;
   } else if (fixed_format == "MJPEG") {
@@ -342,12 +405,41 @@ OBFormat OBFormatFromString(const std::string &format) {
     return OB_FORMAT_RW16;
   } else if (fixed_format == "Y12C4") {
     return OB_FORMAT_Y12C4;
+  } else if (fixed_format == "LIDAR_POINT") {
+    return OB_FORMAT_LIDAR_POINT;
+  } else if (fixed_format == "LIDAR_SPHERE_POINT") {
+    return OB_FORMAT_LIDAR_SPHERE_POINT;
+  } else if (fixed_format == "LIDAR_SCAN") {
+    return OB_FORMAT_LIDAR_SCAN;
+  } else if (fixed_format == "LIDAR_CALIBRATION") {
+    return OB_FORMAT_LIDAR_CALIBRATION;
   }
   //   else if (fixed_format == "DISP16") {
   //     return OB_FORMAT_DISP16;
   //   }
   else {
     return OB_FORMAT_UNKNOWN;
+  }
+}
+
+OBLiDARScanRate OBScanRateFromInt(const int rate) {
+  std::cout << "OBScanRateFromInt: " << rate << std::endl;
+  if (rate == 5) {
+    return OB_LIDAR_SCAN_5HZ;
+  } else if (rate == 10) {
+    return OB_LIDAR_SCAN_10HZ;
+  } else if (rate == 15) {
+    return OB_LIDAR_SCAN_15HZ;
+  } else if (rate == 20) {
+    return OB_LIDAR_SCAN_20HZ;
+  } else if (rate == 25) {
+    return OB_LIDAR_SCAN_25HZ;
+  } else if (rate == 30) {
+    return OB_LIDAR_SCAN_30HZ;
+  } else if (rate == 40) {
+    return OB_LIDAR_SCAN_40HZ;
+  } else {
+    return OB_LIDAR_SCAN_UNKNOWN;
   }
 }
 
@@ -476,7 +568,7 @@ bool isOpenNIDevice(int pid) {
       0x060f, 0x0610, 0x0613, 0x0614, 0x0616, 0x0617, 0x0618, 0x061b, 0x062b, 0x062c, 0x062d,
       0x0632, 0x0633, 0x0634, 0x0635, 0x0636, 0x0637, 0x0638, 0x0639, 0x063a, 0x0650, 0x0651,
       0x0654, 0x0655, 0x0656, 0x0657, 0x0658, 0x0659, 0x065a, 0x065b, 0x065c, 0x065d, 0x0698,
-      0x0699, 0x069a, 0x055c, 0x065e, 0x069a, 0x069f, 0x06a0};
+      0x0699, 0x069a, 0x055c, 0x065e, 0x069a, 0x069f, 0x06a0, 0x069e};
 
   return std::any_of(OPENNI_DEVICE_PIDS.begin(), OPENNI_DEVICE_PIDS.end(),
                      [pid](int pid_openni) { return pid == pid_openni; });
@@ -512,6 +604,38 @@ float depthPrecisionFromString(const std::string &depth_precision_level_str) {
   return std::stof(depth_precision_level_str_num);
 }
 
+std::string colorPowerLineFrequencyToString(int value) {
+  switch (value) {
+    case 0:
+      return "disable";
+    case 1:
+      return "50hz";
+    case 2:
+      return "60hz";
+    case 3:
+      return "auto";
+    default:
+      return "unknown";
+  }
+}
+
+std::string depthPrecisionLevelToString(int value) {
+  switch (static_cast<OB_DEPTH_PRECISION_LEVEL>(value)) {
+    case OB_PRECISION_1MM:
+      return "1mm";
+    case OB_PRECISION_0MM8:
+      return "0.8mm";
+    case OB_PRECISION_0MM4:
+      return "0.4mm";
+    case OB_PRECISION_0MM2:
+      return "0.2mm";
+    case OB_PRECISION_0MM1:
+      return "0.1mm";
+    default:
+      return "unknown";
+  }
+}
+
 OBMultiDeviceSyncMode OBSyncModeFromString(const std::string &mode) {
   if (mode == "FREE_RUN") {
     return OBMultiDeviceSyncMode::OB_MULTI_DEVICE_SYNC_MODE_FREE_RUN;
@@ -529,6 +653,43 @@ OBMultiDeviceSyncMode OBSyncModeFromString(const std::string &mode) {
     return OBMultiDeviceSyncMode::OB_MULTI_DEVICE_SYNC_MODE_HARDWARE_TRIGGERING;
   } else {
     return OBMultiDeviceSyncMode::OB_MULTI_DEVICE_SYNC_MODE_FREE_RUN;
+  }
+}
+
+std::string disparityRangeModeToString(int value) {
+  switch (value) {
+    case 0:
+      return "64";
+    case 1:
+      return "128";
+    case 2:
+      return "256";
+    default:
+      return "unknown";
+  }
+}
+
+std::string exposureRangeModeToString(int value) {
+  switch (value) {
+    case 0:
+      return "regular";
+    case 1:
+      return "ultimate";
+    default:
+      return "unknown";
+  }
+}
+
+std::string intraCameraSyncReferenceToString(int value) {
+  switch (value) {
+    case 0:
+      return "Start";
+    case 1:
+      return "Middle";
+    case 2:
+      return "End";
+    default:
+      return "unknown";
   }
 }
 
@@ -730,7 +891,6 @@ std::string parseUsbPort(const std::string &line) {
 
   if (found_usb) {
     port_id = base_match[1].str();
-    std::cout << "USB port_id: " << port_id << std::endl;
 
     if (base_match[2].str().empty()) {
       std::regex end_regex(".+(-[0-9]+$)", std::regex_constants::ECMAScript);
@@ -738,7 +898,6 @@ std::string parseUsbPort(const std::string &line) {
 
       if (found_end) {
         port_id = port_id.substr(0, port_id.size() - base_match[1].str().size());
-        std::cout << "Modified USB port_id: " << port_id << std::endl;
       }
     }
 
@@ -900,24 +1059,82 @@ OBStreamType obStreamTypeFromString(const std::string &stream_type) {
   }
 }
 
-cv::Mat undistortImage(const cv::Mat &image, const OBCameraIntrinsic &intrinsic,
-                       const OBCameraDistortion &distortion) {
-  cv::Mat undistorted_image;
-  cv::Mat camera_matrix = cv::Mat::eye(3, 3, CV_64F);
-  camera_matrix.at<double>(0, 0) = intrinsic.fx;
-  camera_matrix.at<double>(1, 1) = intrinsic.fy;
-  camera_matrix.at<double>(0, 2) = intrinsic.cx;
-  camera_matrix.at<double>(1, 2) = intrinsic.cy;
+namespace {
+bool isSameIntrinsic(const OBCameraIntrinsic &lhs, const OBCameraIntrinsic &rhs) {
+  return lhs.fx == rhs.fx && lhs.fy == rhs.fy && lhs.cx == rhs.cx && lhs.cy == rhs.cy &&
+         lhs.width == rhs.width && lhs.height == rhs.height;
+}
 
-  // Create the distortion coefficients matrix using the extended distortion model
-  cv::Mat dist_coeffs = (cv::Mat_<float>(8, 1) << distortion.k1, distortion.k2, distortion.p1,
-                         distortion.p2, distortion.k3, distortion.k4, distortion.k5, distortion.k6);
+bool isSameDistortion(const OBCameraDistortion &lhs, const OBCameraDistortion &rhs) {
+  return lhs.model == rhs.model && lhs.k1 == rhs.k1 && lhs.k2 == rhs.k2 && lhs.k3 == rhs.k3 &&
+         lhs.k4 == rhs.k4 && lhs.k5 == rhs.k5 && lhs.k6 == rhs.k6 && lhs.p1 == rhs.p1 &&
+         lhs.p2 == rhs.p2;
+}
 
-  // Undistort the image using OpenCV's undistort function
-  // This function corrects for lens distortion
-  cv::undistort(image, undistorted_image, camera_matrix, dist_coeffs);
+struct UndistortMapCacheEntry {
+  int width = 0;
+  int height = 0;
+  int image_type = 0;
+  OBCameraIntrinsic intrinsic{};
+  OBCameraDistortion distortion{};
+  cv::Mat map1;
+  cv::Mat map2;
+};
+}  // namespace
 
-  return undistorted_image;
+UndistortedImageResult undistortImage(const cv::Mat &image, const OBCameraIntrinsic &intrinsic,
+                                      const OBCameraDistortion &distortion) {
+  UndistortedImageResult result;
+  result.new_intrinsic = intrinsic;
+
+  if (image.empty()) {
+    return result;
+  }
+
+  cv::Mat map1;
+  cv::Mat map2;
+  {
+    static std::mutex cache_mutex;
+    static std::vector<UndistortMapCacheEntry> map_cache;
+
+    std::lock_guard<std::mutex> lock(cache_mutex);
+    auto cache_it = std::find_if(
+        map_cache.begin(), map_cache.end(), [&](const UndistortMapCacheEntry &entry) {
+          return entry.width == image.cols && entry.height == image.rows &&
+                 entry.image_type == image.type() && isSameIntrinsic(entry.intrinsic, intrinsic) &&
+                 isSameDistortion(entry.distortion, distortion);
+        });
+
+    if (cache_it == map_cache.end()) {
+      UndistortMapCacheEntry entry;
+      entry.width = image.cols;
+      entry.height = image.rows;
+      entry.image_type = image.type();
+      entry.intrinsic = intrinsic;
+      entry.distortion = distortion;
+
+      cv::Mat camera_matrix =
+          (cv::Mat_<double>(3, 3) << intrinsic.fx, 0.0, intrinsic.cx, 0.0, intrinsic.fy,
+           intrinsic.cy, 0.0, 0.0, 1.0);
+      cv::Mat dist_coeffs =
+          (cv::Mat_<double>(8, 1) << distortion.k1, distortion.k2, distortion.p1, distortion.p2,
+           distortion.k3, distortion.k4, distortion.k5, distortion.k6);
+      cv::initUndistortRectifyMap(camera_matrix, dist_coeffs, cv::Mat(), camera_matrix,
+                                  cv::Size(image.cols, image.rows), CV_16SC2, entry.map1,
+                                  entry.map2);
+      map_cache.emplace_back(std::move(entry));
+      cache_it = std::prev(map_cache.end());
+    }
+
+    map1 = cache_it->map1;
+    map2 = cache_it->map2;
+  }
+
+  result.image.create(image.size(), image.type());
+  cv::remap(image, result.image, map1, map2, cv::INTER_LINEAR);
+  result.new_intrinsic.width = image.cols;
+  result.new_intrinsic.height = image.rows;
+  return result;
 }
 std::string getDistortionModels(OBCameraDistortion distortion) {
   switch (distortion.model) {
@@ -953,4 +1170,31 @@ std::string calcMD5(const std::string &data) {
   for (unsigned int i = 0; i < digest_len; ++i) ss << std::setw(2) << (int)digest[i];
   return ss.str();
 }
+double getScanAngleIncrement(OBLiDARScanRate fps) {
+  switch (fps) {
+    case OB_LIDAR_SCAN_15HZ:
+      return deg2rad(0.075);
+    case OB_LIDAR_SCAN_20HZ:
+      return deg2rad(0.1);
+    case OB_LIDAR_SCAN_25HZ:
+      return deg2rad(0.125);
+    case OB_LIDAR_SCAN_30HZ:
+      return deg2rad(0.15);
+    case OB_LIDAR_SCAN_40HZ:
+      return deg2rad(0.2);
+    default:
+      return deg2rad(0.1);
+  }
+}
+
+double deg2rad(double deg) { return deg * M_PI / 180.0; }
+
+double rad2deg(double rad) {
+  double angle_degrees = rad * (180.0 / M_PI);
+  if (angle_degrees < 0) {
+    angle_degrees += 360.0;
+  }
+  return angle_degrees;
+}
+
 }  // namespace orbbec_camera

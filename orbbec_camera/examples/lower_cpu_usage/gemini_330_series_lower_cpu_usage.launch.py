@@ -117,6 +117,7 @@ def generate_launch_description():
         DeclareLaunchArgument('ir_info_url', default_value=''),
         DeclareLaunchArgument('color_info_url', default_value=''),
         DeclareLaunchArgument('log_level', default_value='none'),
+        DeclareLaunchArgument('log_file_name', default_value=''),
         DeclareLaunchArgument('enable_publish_extrinsic', default_value='false'),
         DeclareLaunchArgument('enable_d2c_viewer', default_value='false'),
         DeclareLaunchArgument('disparity_to_depth_mode', default_value='HW'),
@@ -165,11 +166,13 @@ def generate_launch_description():
         DeclareLaunchArgument('device_preset', default_value='Default'),
         DeclareLaunchArgument('retry_on_usb3_detection_failure', default_value='false'),
         DeclareLaunchArgument('laser_energy_level', default_value='-1'),
-        DeclareLaunchArgument('enable_sync_host_time', default_value='true'),
+        DeclareLaunchArgument('enable_sync_host_time', default_value='false'),
+        DeclareLaunchArgument('time_sync_period', default_value='6.0'), # seconds
         DeclareLaunchArgument('time_domain', default_value='global'),# global, device, system
         DeclareLaunchArgument('enable_color_undistortion', default_value='false'),
         DeclareLaunchArgument('config_file_path', default_value=''),
         DeclareLaunchArgument('enable_heartbeat', default_value='false'),
+        DeclareLaunchArgument('enable_firmware_log', default_value='false'),
         DeclareLaunchArgument('gmsl_trigger_fps', default_value='3000'),
         DeclareLaunchArgument('enable_gmsl_trigger', default_value='false'),
         DeclareLaunchArgument('disparity_range_mode', default_value='-1'),
@@ -224,7 +227,7 @@ def generate_launch_description():
                     name="ob_camera_node",
                     namespace=LaunchConfiguration("camera_name"),
                     parameters=params,
-                    output="screen",
+                    output="log",
                 )
             ]
         else:
